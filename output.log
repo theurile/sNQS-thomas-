@@ -1,0 +1,12 @@
+nohup: ignoring input
+Parameters:
+Lx=10, Ly=1, N=10, α=3, Q=8, M=500, batch=1, steps=400
+--------------------
+Getting initial state...
+Epoch    1/100, ⟨H⟩=-10.0002627640
+Epoch  100/100, ⟨H⟩=-10.0000534449
+--------------------
+sNQS_rbm time evolution...
+_nodes: tensor([0.0000+0.j, 0.0001+0.j, 0.0002+0.j,  ..., 0.0998+0.j, 0.0999+0.j, 0.1000+0.j],
+       device='cuda:0', dtype=torch.complex128)
+a_ms: [1.]
