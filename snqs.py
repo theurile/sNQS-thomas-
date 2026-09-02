@@ -152,8 +152,8 @@ class sNQS_rbm:
             optimizer = tc.optim.Adam([param], lr=lr, weight_decay=1e-5, amsgrad=True)
         else:
             raise ValueError("optimizer_name must be either 'adamw' or 'adam'.")
-        # scheduler = tc.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=300, cooldown=41, factor=0.5, min_lr=1.e-6)
-        scheduler = tc.optim.lr_scheduler.StepLR(optimizer, step_size=500, gamma=1.1, last_epoch=-1)
+        scheduler = tc.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=300, cooldown=41, factor=0.5, min_lr=1.e-6)
+        # scheduler = tc.optim.lr_scheduler.StepLR(optimizer, step_size=500, gamma=1.1, last_epoch=-1)
         
         losses = []
         time_losses = [] if return_time_losses else None
@@ -185,7 +185,7 @@ class sNQS_rbm:
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
             ema = loss if ema is None else (ema_alpha*ema + (1.-ema_alpha)*loss)
-            scheduler.step()
+            scheduler.step(ema)
             
             # Record
             losses.append(loss)
