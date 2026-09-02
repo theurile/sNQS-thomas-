@@ -31,7 +31,7 @@ class LPEJobConfig:
     Lx: int = 10
     Ly: int = 1
     alpha: int = 5
-    Q: int = 64
+    Q: int = 32
     lpe_order: int = 4
     epochs: int = 1500
     lr: float = 7e-4
