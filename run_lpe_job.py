@@ -33,7 +33,7 @@ class LPEJobConfig:
     alpha: int = 5
     Q: int = 64
     lpe_order: int = 4
-    epochs: int = 4000
+    epochs: int = 1500
     lr: float = 7e-4
     basis_type: str = "fourier"
     scheme: str = "lpe"
