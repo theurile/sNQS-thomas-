@@ -444,7 +444,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dt", type=float, required=True)
     parser.add_argument("--tK", type=float, required=True)
-    parser.add_argument("--n-windows", type=int, default=1)
+    parser.add_argument("--n-windows", type=int, default=1) # added, n_windows * tK = tWin
+    parser.add_argument("--basis_type", type=str, default='fourier')
+    parser.add_argument("--omega_init", type=str, default='integer_harmonics') # added, n_windows * tK = tWin
     parser.add_argument("--epochs", type=int, default=LPEJobConfig.epochs)
     parser.add_argument("--lpe-order", type=int, default=LPEJobConfig.lpe_order)
     parser.add_argument("--optimizer", choices=["adamw", "adam"], default=LPEJobConfig.optimizer_name)
