@@ -18,7 +18,6 @@ from snqs import sNQS_rbm
 from utils import get_LPE_coeffs, get_LPE_time_grid, get_g_qt
 from vmc import VMC
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "results" / "lpe_grid"
 
@@ -31,22 +30,22 @@ class LPEJobConfig:
     Lx: int = 10
     Ly: int = 1
     alpha: int = 5
-    Q: int = 32
+    Q: int = 4
     lpe_order: int = 4
-    epochs: int = 1500
-    lr: float = 7e-4
+    epochs: int = 2000
+    lr: float = 1e-3
     basis_type: str = "fourier"
-    scheme: str = "lpe"
+    scheme: str = "taylor"
     node_type: str = "real"
     optimizer_name: str = "adamw"
     backend: str = "exact"
     objective: str = "link_fidelity"
     J: float = -1.0
     hx: float = -0.3
-    hz: float = -0.3
-    M: int = 2000
+    hz: float = -1.0
+    M: int = 5000
     batch: int = 1
-    vmc_steps: int = 1000
+    vmc_steps: int = 100
     vmc_lr: float = 1.0e-2
     seed: int = 1234
     loss_log_interval: int = 100
@@ -67,11 +66,14 @@ def group_name(config: LPEJobConfig) -> str:
 
 
 def output_path(config: LPEJobConfig) -> Path:
-    return Path(config.output_dir) / config.output_file
+    return Path(config.output_dir) / (f"figures{config.Q}/" + (f"dt={config.dt:g}/tK={config.tK:g}_" + config.output_file))
 
 
 def job_label(config: LPEJobConfig) -> str:
-    return f"lpe_dt{_slug(config.dt)}_tK{_slug(config.tK)}"
+    if config.scheme == 'lpe':
+        return f"lpe_dt{_slug(config.dt)}_tK{_slug(config.tK)}"
+    elif config.scheme =='taylor':
+        return f"taylor_dt{_slug(config.dt)}_tK{_slug(config.tK)}"
 
 
 def _n10_ed_benchmark() -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
@@ -207,7 +209,7 @@ def plot_lpe_result(data: dict, config: LPEJobConfig) -> tuple[Path, Path]:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    figures_dir = Path(config.output_dir) / "figures"
+    figures_dir = Path(config.output_dir) / f"figures{config.Q}"
     figures_dir.mkdir(parents=True, exist_ok=True)
 
     label = job_label(config)
@@ -223,42 +225,48 @@ def plot_lpe_result(data: dict, config: LPEJobConfig) -> tuple[Path, Path]:
     fig = plt.figure(figsize=(14.0, 1.9))
     axes = [fig.add_subplot(1, 4, idx + 1) for idx in range(4)]
 
-    n10_benchmark = _has_n10_benchmark(config)
+    # this displays exact dynamics for any given TFIM Hamiltonians
+    from utils import exact_dynamics
+    t_max = 2.0
+    ts_exact, sx_exact, sz_exact, energy_exact = exact_dynamics(config.Lx, config.Ly, config.J,
+                                                                config.hx, config.hz,
+                                                                t_max,
+                                                                dt_out=0.1, dt_int=0.01, order=12, device="cpu")
+    '''
     if n10_benchmark:
         ts_exact, sx_exact, sz_exact, energy_exact = _n10_ed_benchmark()
     else:
         ts_exact = sx_exact = sz_exact = None
         energy_exact = None
+    '''
 
-    axes[0].plot(t_physical, observables["Sx_per_site_physical"], ".-", label="sNQS LPE exact")
-    if n10_benchmark:
-        axes[0].plot(ts_exact, sx_exact, ".", label="ED")
-        axes[0].set_xlim(0.0, 2.0)
-    else:
-        axes[0].set_xlim(float(t_physical.min()), float(t_physical.max()))
+    axes[0].plot(t_physical, observables["Sx_per_site_physical"], "-", label="sNQS LPE exact")
+    axes[0].plot(ts_exact, sx_exact, ".", label="ED")
+    axes[0].set_xlim(0.0, t_max)
+    #else:
+     #   axes[0].set_xlim(float(t_physical.min()), float(t_physical.max()))
     axes[0].set_xlabel("Time")
     axes[0].set_ylabel(r"$\langle \sigma_x \rangle$")
     axes[0].ticklabel_format(axis="y", style="plain", useOffset=False)
     axes[0].legend()
 
-    axes[1].plot(t_physical, observables["Sz_per_site_physical"], ".-", label="sNQS LPE exact")
-    if n10_benchmark:
-        axes[1].plot(ts_exact, sz_exact, ".", label="ED")
-        axes[1].set_xlim(0.0, 2.0)
-    else:
-        axes[1].set_xlim(float(t_physical.min()), float(t_physical.max()))
+    axes[1].plot(t_physical, observables["Sz_per_site_physical"], "-", label="sNQS LPE exact")
+    axes[1].plot(ts_exact, sz_exact, ".", label="ED" )
+    axes[1].set_xlim(0.0, t_max)
+    # else:
+      #  axes[1].set_xlim(float(t_physical.min()), float(t_physical.max()))
     axes[1].set_xlabel("Time")
     axes[1].set_ylabel(r"$\langle \sigma_z \rangle$")
     axes[1].ticklabel_format(axis="y", style="plain", useOffset=False)
     axes[1].legend()
 
-    axes[2].plot(t_physical, observables["E_per_site_physical"], ".-", label="sNQS LPE exact")
-    if n10_benchmark:
-        axes[2].axhline(y=energy_exact, color="k", linestyle="--", label="Exact")
-        axes[2].set_xlim(0.0, 2.0)
-        axes[2].set_ylim(min(float(np.min(observables["E_per_site_physical"])), energy_exact) - 0.01, -0.2)
-    else:
-        axes[2].set_xlim(float(t_physical.min()), float(t_physical.max()))
+    axes[2].plot(t_physical, observables["E_per_site_physical"], "-", label="sNQS LPE exact")
+    #if n10_benchmark:
+    axes[2].axhline(y=energy_exact[0], color="k", linestyle="--", label="Exact")
+    axes[2].set_xlim(0.0, t_max)
+    axes[2].set_ylim(min(float(np.min(observables["E_per_site_physical"])), energy_exact[0]) - 0.01, -0.2)
+    #else:
+        #axes[2].set_xlim(float(t_physical.min()), float(t_physical.max()))
     axes[2].set_xlabel("Time")
     axes[2].set_ylabel("Energy per site")
     axes[2].ticklabel_format(axis="y", style="plain", useOffset=False)
@@ -276,11 +284,10 @@ def plot_lpe_result(data: dict, config: LPEJobConfig) -> tuple[Path, Path]:
     plt.close(fig)
 
     fig_loss, ax = plt.subplots(figsize=(8.2, 4.8))
-    ax.plot(t_physical, final_loss_physical, ".-", linewidth=1.2, markersize=4.5)
-    if n10_benchmark:
-        ax.set_xlim(0.0, 2.0)
-    else:
-        ax.set_xlim(float(t_physical.min()), float(t_physical.max()))
+    ax.plot(t_physical, final_loss_physical, ".-", linewidth=1.2, markersize=2)
+    ax.set_xlim(0.0, t_max)
+    #else:
+     #   ax.set_xlim(float(t_physical.min()), float(t_physical.max()))
     ax.set_xlabel("Physical time")
     ax.set_ylabel("Final local loss value")
     ax.set_yscale("log")
@@ -293,7 +300,7 @@ def plot_lpe_result(data: dict, config: LPEJobConfig) -> tuple[Path, Path]:
     return summary_path, loss_path
 
 
-def run_lpe_job(config: LPEJobConfig, *, dry_run: bool = False) -> tuple[Path, str]:
+def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_override=None, psi_initial_override=None):
     filename = output_path(config)
     group = group_name(config)
     print(f"job={job_label(config)}")
@@ -312,35 +319,54 @@ def run_lpe_job(config: LPEJobConfig, *, dry_run: bool = False) -> tuple[Path, s
 
     print("-" * 20)
     print("Getting initial state...")
-    theta_rand = random_θ(N=config.N, α=config.alpha, device=device)
-    S_rand = random_samples(config.M, config.N, device=device)
-    print("vmc-ing ")
-    vmc = VMC(theta_rand, config.Lx, config.Ly, config.alpha, model=TIM(0.0, -1.0, 0.0))
-    psi_initial, _ = vmc.train(
-        S_rand,
-        config.batch,
-        steps=config.vmc_steps,
-        lr=config.vmc_lr,
-        log_interval=config.vmc_steps,
-    )
 
-    print("assigning theta ")
-    theta_jq0 = tc.zeros((psi_initial.θ.numel(), config.Q), dtype=tc.complex128, device=device)
-    theta_jq0[:, 0] = psi_initial.θ.detach().clone()
 
-    print("getting coeffs ")
-    a_ms = get_LPE_coeffs(order=config.lpe_order)
-    t_nodes, a_links, phy_idx = get_LPE_time_grid(
-        config.t0,
-        config.tK,
-        dt=config.dt,
-        a_ms=a_ms,
-        device=device,
-        node_type=config.node_type,
-    )
-    print("getting qgt ")
-    g_qt = get_g_qt(t_nodes, config.Q, device, basis_type=config.basis_type)
-    print("defining snqs model ")
+    if psi_initial_override is not None:
+        psi_initial = psi_initial_override
+    else:
+        theta_rand = random_θ(N=config.N, α=config.alpha, device=device)
+        S_rand = random_samples(config.M, config.N, device=device)
+        vmc = VMC(theta_rand, config.Lx, config.Ly, config.alpha, model=TIM(0.0, -1.0, 0.0))
+        psi_initial, S = vmc.train(
+            S_rand,
+            config.batch,
+            steps=config.vmc_steps,
+            lr=config.vmc_lr,
+            log_interval=config.vmc_steps,
+        )
+
+
+    if theta_jq0_override is not None:
+        theta_jq0 = theta_jq0_override
+    else:
+        theta_jq0 = tc.zeros((psi_initial.θ.numel(), config.Q), dtype=tc.complex128, device=device)
+        theta_jq0[:, 0] = psi_initial.θ.detach().clone()
+
+    if config.scheme == 'lpe':
+        a_ms = get_LPE_coeffs(order=config.lpe_order)
+        t_nodes, a_links, phy_idx = get_LPE_time_grid(
+            config.t0, config.tK, dt=config.dt, a_ms=a_ms, device=device, node_type=config.node_type,
+        )
+    else:
+        t_nodes = tc.arange(config.t0, config.tK + 0.5 * config.dt, config.dt, device=device, dtype=tc.float64)
+        phy_idx = [0, 0, 0, 0]
+        a_ms, a_links = tc.empty(5), tc.empty(5)
+
+    g_qt, omega_q = get_g_qt(t_nodes, config.Q, device, basis_type=config.basis_type, model=model, config=config)
+    if config.basis_type == "fourier" and omega_q0_override is not None:
+        print("Previous omega detected, overriding window initialization.. ")
+        omega_q = tc.as_tensor(omega_q0_override, device=device).detach().real.to(tc.float64)
+        g_qt = tc.cat([
+            g_qt[:1],  # constant mode
+            tc.exp(-1j * omega_q.to(tc.complex128)[:, None] * t_nodes.real.to(tc.complex128)[None, :]),
+        ], dim=0)
+
+    alpha = 0.3
+    g_t0 = g_qt[:, 0]  # basis values at the new window's t0
+    theta_jq0[:, 1:] *= alpha  # shrink the inherited oscillating parts
+    # re-adjust the constant column so ϑ(t0) still equals the previous end point exactly
+    theta_jq0[:, 0] = (theta_jq0 @ g_t0 - theta_jq0[:, 1:] @ g_t0[1:]) / g_t0[0]
+
     snqs = sNQS_rbm(
         theta_jq0,
         g_qt,
@@ -349,8 +375,11 @@ def run_lpe_job(config: LPEJobConfig, *, dry_run: bool = False) -> tuple[Path, s
         config.alpha,
         config.dt,
         model,
+        omega_q=omega_q,
+        omega_trainable=True,
+        t_nodes=t_nodes,
         backend=config.backend,
-        scheme=config.scheme,
+        scheme="taylor",
         a_links=a_links,
         phy_idx=phy_idx,
     )
@@ -359,7 +388,7 @@ def run_lpe_job(config: LPEJobConfig, *, dry_run: bool = False) -> tuple[Path, s
     print(f"Running sNQS_rbm with backend={config.backend}, objective={config.objective}...")
     print(f"a_ms: {a_ms}")
     print(f"t_nodes: {_to_numpy(t_nodes)}")
-    theta_jq, Ss, losses, losses_by_time, _ = snqs.train(
+    theta_jq, Ss, losses, losses_by_time, ψfinal = snqs.train(
         psi_initial,
         Sini=None if config.backend == "exact" else S_rand,
         batch=config.batch,
@@ -372,34 +401,50 @@ def run_lpe_job(config: LPEJobConfig, *, dry_run: bool = False) -> tuple[Path, s
     )
 
     E, Sx, Sz = snqs.expectation_value(Ss, batch=20 * config.batch)
-    data = build_hdf5_data(
-        config,
-        theta_initial=psi_initial.θ.detach().clone(),
-        theta_jq=theta_jq,
-        t_nodes=t_nodes,
-        a_ms=a_ms,
-        a_links=a_links,
-        phy_idx=phy_idx,
-        losses=losses,
-        losses_by_time=losses_by_time,
-        E=E,
-        Sx=Sx,
-        Sz=Sz,
-    )
-
+    if config.scheme == 'lpe':
+        data = build_hdf5_data(
+            config,
+            theta_initial=psi_initial.θ.detach().clone(),
+            theta_jq=theta_jq,
+            t_nodes=t_nodes,
+            a_ms=a_ms,
+            a_links=a_links,
+            phy_idx=phy_idx,
+            losses=losses,
+            losses_by_time=losses_by_time,
+            E=E,
+            Sx=Sx,
+            Sz=Sz,
+        )
+    else:
+        data = build_hdf5_data(
+            config,
+            theta_initial=psi_initial.θ.detach().clone(),
+            theta_jq=theta_jq,
+            t_nodes=t_nodes,
+            a_ms=tc.tensor([]),
+            a_links = tc.tensor([]),
+            phy_idx = list(range(len(t_nodes))),
+            losses=losses,
+            losses_by_time=losses_by_time,
+            E=E,
+            Sx=Sx,
+            Sz=Sz,
+        )
     filename.parent.mkdir(parents=True, exist_ok=True)
     save_hdf5(filename=str(filename), group=group, mode="a", data=data)
     summary_path, loss_path = plot_lpe_result(data, config)
     print(f"saved HDF5 group {filename}::{group}")
     print(f"saved summary figure {summary_path}")
     print(f"saved local-loss figure {loss_path}")
-    return filename, group
+    return theta_jq, ψfinal, data, snqs.omega_q.detach().clone()
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dt", type=float, required=True)
     parser.add_argument("--tK", type=float, required=True)
+    parser.add_argument("--n-windows", type=int, default=1)
     parser.add_argument("--epochs", type=int, default=LPEJobConfig.epochs)
     parser.add_argument("--lpe-order", type=int, default=LPEJobConfig.lpe_order)
     parser.add_argument("--optimizer", choices=["adamw", "adam"], default=LPEJobConfig.optimizer_name)

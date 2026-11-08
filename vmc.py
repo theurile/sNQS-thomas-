@@ -18,7 +18,7 @@ class VMC:
         self.N = Lx * Ly
         self.α = α
         self.model = model
-        assert model.J == model.hz == 0
+        # assert model.J == model.hz == 0
         
         self.Np = θ.numel()
         self.device = θ.device
@@ -78,22 +78,26 @@ class VMC:
         S_mat = S_mat + (1.e-3 * scale).to(tc.complex128) * tc.eye(Np, dtype=tc.complex128, device=device)
         delta = tc.linalg.solve(S_mat, F)
         return delta, mean_E.real.item()
-    
-    def Eloc(self, s_mn:tc.Tensor) -> tc.Tensor:
+
+    # modified to include hz so we can compute ground states of mixed field Hamiltonians also
+    def Eloc(self, s_mn: tc.Tensor) -> tc.Tensor:
         device = s_mn.device
         ψ = self.ψ
         Nmc, N = s_mn.shape
-        hx = self.model.hx
+        J, hx, hz = self.model.J, self.model.hx, self.model.hz
+        bonds = self.model.bonds(self.Lx, self.Ly).to(device=device, dtype=tc.long)
+
         lnψ_m = ψ.lnPsi(s_mn)
-        # r_i(s)
+        # off-diagonal: hx * sum_i ψ(s^i)/ψ(s)
         s_mnn = s_mn[:, None, :].expand(Nmc, N, N).clone()
         idx = tc.arange(N, device=device)
         s_mnn[:, idx, idx] *= -1
-        S2 = s_mnn.reshape(-1, N)
-        lnψ_mn = ψ.lnPsi(S2).reshape(Nmc, N)
+        lnψ_mn = ψ.lnPsi(s_mnn.reshape(-1, N)).reshape(Nmc, N)
         r_mn = tc.exp(lnψ_mn - lnψ_m[:, None])
-        Eloc = hx * r_mn.sum(dim=1)
-        return Eloc
+        # diagonal: J * sum_<ij> s_i s_j + hz * sum_i s_i
+        s_real = s_mn.real.to(tc.float64)
+        E_diag = J * (s_real[:, bonds[:, 0]] * s_real[:, bonds[:, 1]]).sum(dim=1) + hz * s_real.sum(dim=1)
+        return E_diag + hx * r_mn.sum(dim=1)
       
     def energy_Sx_Sz(self, s_mn:tc.Tensor, bonds:tc.Tensor) -> tuple[float, float, float]:
         device = self.device

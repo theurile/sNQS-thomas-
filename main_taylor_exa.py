@@ -49,14 +49,16 @@ def main() -> None:
     g_qt = get_g_qt(t_nodes, Q, device, basis_type="simple")
     snqs = sNQS_rbm(
         θ_jq,
-        g_qt,
+        t_nodes,
         Lx,
         Ly,
         α,
         dt,
         model,
+        Q=Q,
         backend=backend,
         scheme="taylor",
+        basis_type="simple"
     )
 
     print("-" * 20)
@@ -69,6 +71,8 @@ def main() -> None:
         lr=lr,
         log_interval=max(1, steps // 10),
     )
+
+    print("made it here")
 
     E, Sx, Sz = snqs.expectation_value(Ss, batch=20 * batch)
     t_plot = t_nodes.detach().cpu().real.numpy()
@@ -130,7 +134,7 @@ def main() -> None:
     ax.set_yscale("log")
 
     plt.tight_layout()
-    plt.savefig("results_taylor_exa.png", dpi=300, bbox_inches="tight")
+    plt.savefig("abacada.png", dpi=300, bbox_inches="tight")
 
 
 if __name__ == "__main__":

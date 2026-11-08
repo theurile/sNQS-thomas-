@@ -3,8 +3,8 @@
 # @Date:   2025-09-06 18:53:53
 # @Last Modified by:   dzwang
 # @Last Modified time: 2026-04-20 16:32:15
-import torch as tc
 
+import torch as tc
 
 __all__ = ["RBM", "random_θ", "random_θ_jq"]
 
