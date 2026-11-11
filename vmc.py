@@ -4,7 +4,7 @@
 # @Last Modified by:   dzwang
 # @Last Modified time: 2026-02-03 19:17:17
 import torch as tc
-from rbm import RBM
+from cnn import CNN
 from tqdm import tqdm
 from sampler import Metropolis
 from model import TIM
@@ -24,10 +24,10 @@ class VMC:
         self.device = θ.device
     
     @property
-    def ψ(self) -> RBM:
-        return RBM(self.θ, self.N, self.α)
+    def ψ(self) -> CNN:
+        return CNN(self.θ, self.N, self.α)
     
-    def train(self, S0:tc.Tensor, batch:int, *, steps:int, lr:float, log_interval:int) -> tuple[RBM, tc.Tensor]:
+    def train(self, S0:tc.Tensor, batch:int, *, steps:int, lr:float, log_interval:int) -> tuple[CNN, tc.Tensor]:
         device = self.device
         
         S = S0.clone().to(device)

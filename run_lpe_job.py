@@ -12,9 +12,9 @@ import torch as tc
 from quante.basicfun import save_hdf5
 
 from model import TIM
-from rbm import random_θ
+from cnn import random_θ, configure
 from sampler import random_samples
-from snqs import sNQS_rbm
+from snqs import sNQS_rbm, sNQS_cnn
 from utils import get_LPE_coeffs, get_LPE_time_grid, get_g_qt
 from vmc import VMC
 
@@ -29,20 +29,21 @@ class LPEJobConfig:
     t0: float = 0.0
     Lx: int = 10
     Ly: int = 1
-    alpha: int = 5
+    alpha: tuple[int, int] = (5, 5)
     Q: int = 4
     lpe_order: int = 4
     epochs: int = 2000
     lr: float = 1e-3
     basis_type: str = "fourier"
+    omega_init: str = "integer_harmonics"
     scheme: str = "taylor"
     node_type: str = "real"
     optimizer_name: str = "adamw"
     backend: str = "exact"
     objective: str = "link_fidelity"
     J: float = -1.0
-    hx: float = -0.3
-    hz: float = -1.0
+    hx: float = -1.0
+    hz: float = -0.3
     M: int = 5000
     batch: int = 1
     vmc_steps: int = 100
@@ -361,13 +362,10 @@ def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_over
             tc.exp(-1j * omega_q.to(tc.complex128)[:, None] * t_nodes.real.to(tc.complex128)[None, :]),
         ], dim=0)
 
-    alpha = 0.3
-    g_t0 = g_qt[:, 0]  # basis values at the new window's t0
-    theta_jq0[:, 1:] *= alpha  # shrink the inherited oscillating parts
-    # re-adjust the constant column so ϑ(t0) still equals the previous end point exactly
-    theta_jq0[:, 0] = (theta_jq0 @ g_t0 - theta_jq0[:, 1:] @ g_t0[1:]) / g_t0[0]
+    from cnn import configure
+    configure(Lx=config.Lx, Ly=config.Ly, boundary="open")  # kernel_size=None -> full receptive field
 
-    snqs = sNQS_rbm(
+    snqs = sNQS_cnn(
         theta_jq0,
         g_qt,
         config.Lx,
@@ -377,6 +375,7 @@ def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_over
         model,
         omega_q=omega_q,
         omega_trainable=True,
+        n_fixed_rows=2 if config.basis_type == "fourier_linear" else 1,
         t_nodes=t_nodes,
         backend=config.backend,
         scheme="taylor",

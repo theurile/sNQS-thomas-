@@ -221,6 +221,7 @@ def run_lpe_untrained_diagnostic(
         phy_idx=phy_idx,
         omega_q=omega_q,  # None -> non-Fourier basis
         omega_trainable=bool(getattr(config, "omega_trainable", False)) and omega_q is not None,
+        n_fixed_rows=2 if config.basis_type == "fourier_linear" else 1,
         t_nodes=t_nodes,
     )
 
@@ -334,16 +335,17 @@ def run_lpe_untrained_diagnostic(
 def main() -> None:
     args = parse_args()
     # run_lpe_untrained_diagnostic(config)
-    for i in range(5, 7, 3):
+    for i in range(5, 13, 2):
         args.Q = i
         config = LPEJobConfig(
             dt=args.dt,
             tK=args.tK,
-            epochs=10000,
-            lr=1e-3,
+            epochs=5000,
+            lr=8e-3,
             lpe_order=args.lpe_order,
             optimizer_name=args.optimizer,
-            basis_type='fourier',
+            basis_type=args.basis_type,
+            omega_init=args.omega_init,
             node_type="real",
             scheme='taylor',
             objective='link_fidelity',
@@ -353,7 +355,7 @@ def main() -> None:
             alpha=args.alpha,
             M=args.M,
             batch=args.batch,
-            vmc_steps=500,
+            vmc_steps=100,
             loss_log_interval=args.loss_log_interval,
             seed=args.seed,
             output_dir=args.output_dir,
