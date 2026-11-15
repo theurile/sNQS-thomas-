@@ -62,7 +62,7 @@ def _time_rescaling(t, t0, t1):
     rescaled = ((t - t[0]) * (t1-t0) / (t[-1] - t[0])) + t0
     return rescaled
 
-def _fourier_mode(t, Q, model, config, device="cpu", omega_init='integer_harmonics'):
+def _fourier_mode(t, Q, model, config, device="cuda" if tc.cuda.is_available() else "cpu", omega_init='integer_harmonics'):
     dtype = tc.complex128
     t = tc.as_tensor(t, dtype=tc.float64, device=device)
     qs = tc.arange(1, Q, device='cpu')
