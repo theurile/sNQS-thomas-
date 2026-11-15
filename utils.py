@@ -100,7 +100,7 @@ def _fourier_mode(t, Q, model, config, device="cpu", omega_init='integer_harmoni
         omega_q = tc.as_tensor(omega_q, dtype=tc.float64, device=t.device)
     elif omega_init == 'analytic_ansatz':
         D0 = 2 * math.sqrt(config.hx ** 2 + config.hz ** 2)  # single-spin gap
-        qs = tc.arange(1, (Q - 1) // 2 + 1, dtype=tc.float64)
+        qs = tc.arange(1, (Q - 1) // 2 + 1, dtype=tc.float64, device=t.device)
         omega_q = tc.cat([-qs.flip(0), qs]) * D0  # ±Δ0, ±2Δ0, ... (Q odd)
     elif omega_init == 'integer_harmonics':
         omega_q = qs
@@ -112,7 +112,7 @@ def _fourier_mode(t, Q, model, config, device="cpu", omega_init='integer_harmoni
     elif omega_init == 'window_linspace':
         epsilon_max = 0.1 * 2 * math.pi / config.dt
         epsilon_min = 2 * math.pi / (2.0)
-        omega_q = tc.linspace(epsilon_min, epsilon_max, Q - 1, dtype=tc.float64)
+        omega_q = tc.linspace(epsilon_min, epsilon_max, Q - 1, dtype=tc.float64, device=t.device)
     else:
         print(f"Unsupported omega initialization scheme {omega_init}.")
 

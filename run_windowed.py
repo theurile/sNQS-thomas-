@@ -330,7 +330,7 @@ def main() -> None:
             dt=args.dt,
             tK=args.tK,
             epochs=5000,
-            lr=5e-3,
+            lr=5e-4,
             lpe_order=args.lpe_order,
             optimizer_name=args.optimizer,
             basis_type=args.basis_type,

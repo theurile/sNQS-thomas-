@@ -30,7 +30,7 @@ class LPEJobConfig:
     t0: float = 0.0
     Lx: int = 10
     Ly: int = 1
-    alpha: tuple[int, int] = (5, 5)
+    alpha: tuple[int, int] = (5, 5, 5)
     Q: int = 4
     lpe_order: int = 4
     epochs: int = 2000
