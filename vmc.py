@@ -4,6 +4,7 @@
 # @Last Modified by:   dzwang
 # @Last Modified time: 2026-02-03 19:17:17
 import torch as tc
+from rbm import RBM
 from cnn import CNN
 from tqdm import tqdm
 from sampler import Metropolis
@@ -25,7 +26,7 @@ class VMC:
     
     @property
     def ψ(self) -> CNN:
-        return CNN(self.θ, self.N, self.α)
+        return CNN(self.θ, self.Lx, self.Ly, self.α, kernel_size=(5,1))
     
     def train(self, S0:tc.Tensor, batch:int, *, steps:int, lr:float, log_interval:int) -> tuple[CNN, tc.Tensor]:
         device = self.device

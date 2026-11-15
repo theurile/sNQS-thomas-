@@ -12,7 +12,8 @@ import torch as tc
 from quante.basicfun import save_hdf5
 
 from model import TIM
-from cnn import random_θ, configure
+import cnn
+import rbm
 from sampler import random_samples
 from snqs import sNQS_rbm, sNQS_cnn
 from utils import get_LPE_coeffs, get_LPE_time_grid, get_g_qt
@@ -34,6 +35,8 @@ class LPEJobConfig:
     lpe_order: int = 4
     epochs: int = 2000
     lr: float = 1e-3
+    network_type: str = "cnn"
+    kernel_size: tuple[int, int] = (5, 1)
     basis_type: str = "fourier"
     omega_init: str = "integer_harmonics"
     scheme: str = "taylor"
@@ -67,7 +70,7 @@ def group_name(config: LPEJobConfig) -> str:
 
 
 def output_path(config: LPEJobConfig) -> Path:
-    return Path(config.output_dir) / (f"figures{config.Q}/" + (f"dt={config.dt:g}/tK={config.tK:g}_" + config.output_file))
+    return Path(config.output_dir) / (f"{config.basis_type}_{config.omega_init}_Q{config.Q}/" + (f"dt={config.dt:g}/tK={config.tK:g}_" + config.output_file))
 
 
 def job_label(config: LPEJobConfig) -> str:
@@ -210,7 +213,7 @@ def plot_lpe_result(data: dict, config: LPEJobConfig) -> tuple[Path, Path]:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    figures_dir = Path(config.output_dir) / f"figures{config.Q}"
+    figures_dir = Path(config.output_dir) / f"{config.basis_type}_{config.omega_init}_Q{config.Q}"
     figures_dir.mkdir(parents=True, exist_ok=True)
 
     label = job_label(config)
@@ -318,6 +321,9 @@ def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_over
     device = "cuda" if tc.cuda.is_available() else "cpu"
     model = TIM(J=config.J, hx=config.hx, hz=config.hz)
 
+    # selects network type
+    net = {"rbm": rbm, "cnn": cnn}[config.network_type]
+
     print("-" * 20)
     print("Getting initial state...")
 
@@ -325,7 +331,7 @@ def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_over
     if psi_initial_override is not None:
         psi_initial = psi_initial_override
     else:
-        theta_rand = random_θ(N=config.N, α=config.alpha, device=device)
+        theta_rand = net.random_θ(N=config.N, α=config.alpha, Kx=config.kernel_size[0], Ky=config.kernel_size[1], device=device)
         S_rand = random_samples(config.M, config.N, device=device)
         vmc = VMC(theta_rand, config.Lx, config.Ly, config.alpha, model=TIM(0.0, -1.0, 0.0))
         psi_initial, S = vmc.train(
@@ -341,7 +347,7 @@ def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_over
         theta_jq0 = theta_jq0_override
     else:
         theta_jq0 = tc.zeros((psi_initial.θ.numel(), config.Q), dtype=tc.complex128, device=device)
-        theta_jq0[:, 0] = psi_initial.θ.detach().clone()
+        theta_jq0 = net.random_θ_jq(Q=config.Q, N=config.N, α=config.alpha, Kx=config.kernel_size[0], Ky=config.kernel_size[1], device=device)
 
     if config.scheme == 'lpe':
         a_ms = get_LPE_coeffs(order=config.lpe_order)
@@ -353,7 +359,7 @@ def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_over
         phy_idx = [0, 0, 0, 0]
         a_ms, a_links = tc.empty(5), tc.empty(5)
 
-    g_qt, omega_q = get_g_qt(t_nodes, config.Q, device, basis_type=config.basis_type, model=model, config=config)
+    g_qt, omega_q = get_g_qt(t_nodes, config.Q, device, basis_type=config.basis_type, model=model, config=config, omega_init=config.omega_init)
     if config.basis_type == "fourier" and omega_q0_override is not None:
         print("Previous omega detected, overriding window initialization.. ")
         omega_q = tc.as_tensor(omega_q0_override, device=device).detach().real.to(tc.float64)
@@ -361,9 +367,6 @@ def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_over
             g_qt[:1],  # constant mode
             tc.exp(-1j * omega_q.to(tc.complex128)[:, None] * t_nodes.real.to(tc.complex128)[None, :]),
         ], dim=0)
-
-    from cnn import configure
-    configure(Lx=config.Lx, Ly=config.Ly, boundary="open")  # kernel_size=None -> full receptive field
 
     snqs = sNQS_cnn(
         theta_jq0,
@@ -376,6 +379,8 @@ def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_over
         omega_q=omega_q,
         omega_trainable=True,
         n_fixed_rows=2 if config.basis_type == "fourier_linear" else 1,
+        kernel_size=config.kernel_size,
+        open_boundary=True,
         t_nodes=t_nodes,
         backend=config.backend,
         scheme="taylor",

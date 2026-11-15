@@ -16,6 +16,7 @@ from exact import (
     tim_hamiltonian_action,
 )
 from rbm import RBM
+from rbm_jastrow import RBM_jastrow
 from cnn import CNN
 from model import TIM
 from sampler import Metropolis
@@ -450,7 +451,7 @@ class sNQS_rbm:
             mean_OU = sum_OU / Nmc
             mean_U = sum_U / Nmc
             cov = mean_OU - mean_O * mean_U
-            G = cov / (mean_U + 1e-8)
+            G = cov / (mean_U)
             C = mean_U.item()
             return G, C
 
@@ -916,9 +917,10 @@ class sNQS_cnn:
                               against omega_q and t_nodes at construction.
     """
 
-    def __init__(self, θ_jq: tc.Tensor, g_qt: tc.Tensor, Lx: int, Ly: int, α: int, Δt: float, model: TIM,
+    def __init__(self, θ_jq: tc.Tensor, g_qt: tc.Tensor, Lx: int, Ly: int, α, Δt: float, model: TIM,
         *,
         kernel_size: int | tuple[int, int] | None = None,
+        open_boundary: bool | None = True,
         use_visible_bias: bool = True,
         backend: str = "mc",
         max_exact_spins: int = 16,
@@ -939,9 +941,10 @@ class sNQS_cnn:
         self.Δt = Δt
         self.model = model
         self.kernel_size = kernel_size
+        self.open = open_boundary
         self.use_visible_bias = use_visible_bias
 
-        self.Np = θ_jq.shape[0]  # number of paramters in each network
+        self.Np = θ_jq.shape[0]  # number of parameters in each network
         self.Q = g_qt.shape[0]   # number of temporal basis functions
         self.K = g_qt.shape[1]   # number of time nodes
         self.device = θ_jq.device
@@ -1017,7 +1020,8 @@ class sNQS_cnn:
     def ψs(self) -> list[CNN]:  # 's' labels time
         θ_jt = self.θ_jq @ self.g_qt
         return [
-            CNN(θ_jt[:, k].contiguous(), self.N, self.α)
+            CNN(θ_jt[:, k].contiguous(), self.Lx, self.Ly, self.α,
+                kernel_size=self.kernel_size, open_boundary=self.open)
             for k in range(self.K)
         ]
 

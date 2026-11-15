@@ -197,7 +197,7 @@ def run_lpe_untrained_diagnostic(
         a_ms, a_links = tc.empty(5), tc.empty(5)
 
     # g_qt is built outside the object (absolute times, so warm starts are true continuations)
-    g_qt, omega_q = get_g_qt(t_nodes, config.Q, device, basis_type=config.basis_type, model=model)
+    g_qt, omega_q = get_g_qt(t_nodes, config.Q, device, basis_type=config.basis_type, config=config, model=model, omega_init=config.omega_init)
     if config.basis_type == "fourier" and omega_q0_override is not None:
         # continue from given (e.g. previously trained) frequencies: rebuild the Fourier rows with them
         omega_q = tc.as_tensor(omega_q0_override, device=device).detach()
@@ -254,16 +254,8 @@ def run_lpe_untrained_diagnostic(
     n_points = max(int(round(T_span * extrapolation_factor / float(config.dt))), 2) + 1
     t_ext = np.linspace(t0, t0 + T_span * extrapolation_factor, n_points, dtype=np.float64)  # absolute times
 
-    if snqs.is_fourier:
-        omega_q = snqs.omega_q.detach()  # trained (or fixed) frequencies
-        g_qt_ext = _fourier_basis(t_ext, omega_q, snqs.g_qt[:1, :1].detach())
-    else:
-        omega_q = None
-        print("WARNING: non-Fourier basis. get_g_qt maps the basis onto the grid it is given; for "
-              "Chebyshev this rescales r(t) to the extended grid, which is NOT the trained basis. "
-              "Evaluate the basis with the training window's [t0, tK] mapping for a valid test.")
-        out = get_g_qt(t_ext, config.Q, device, basis_type=config.basis_type, model=model)
-        g_qt_ext = out[0] if isinstance(out, tuple) else out
+    g_qt_ext, omega_q = get_g_qt(t_ext, config.Q, device, basis_type=config.basis_type, model=model, config=config,
+                             omega_init=config.omega_init)
 
     theta_jt_ext = theta_jq.detach().to(g_qt_ext.dtype) @ g_qt_ext  # (Np, len(t_ext)) -- NO retraining
 
@@ -334,18 +326,15 @@ def run_lpe_untrained_diagnostic(
 
 def main() -> None:
     args = parse_args()
-    # run_lpe_untrained_diagnostic(config)
-    for i in range(5, 13, 2):
-        args.Q = i
-        config = LPEJobConfig(
+    config = LPEJobConfig(
             dt=args.dt,
             tK=args.tK,
             epochs=5000,
-            lr=8e-3,
+            lr=5e-3,
             lpe_order=args.lpe_order,
             optimizer_name=args.optimizer,
             basis_type=args.basis_type,
-            omega_init=args.omega_init,
+            omega_init='analytic_ansatz',
             node_type="real",
             scheme='taylor',
             objective='link_fidelity',
@@ -361,6 +350,7 @@ def main() -> None:
             output_dir=args.output_dir,
             output_file=args.output_file,
         )
-        run_windowed(config, args.tK, args.n_windows)
+    # run_lpe_untrained_diagnostic(config)
+    run_windowed(config, args.tK, args.n_windows)
 if __name__ == "__main__":
     main()
