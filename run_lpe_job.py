@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Run one exact-backend LPE sNQS job and save the result as HDF5."""
+"""Run one exact-backend sNQS job and save the result as HDF5."""
 
 from __future__ import annotations
 
 import argparse
+import ast
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -30,7 +31,7 @@ class LPEJobConfig:
     t0: float = 0.0
     Lx: int = 10
     Ly: int = 1
-    alpha: tuple[int, int] = (5, 5, 5)
+    alpha: int | tuple[int, ...] = 5
     Q: int = 4
     lpe_order: int = 4
     epochs: int = 2000
@@ -39,6 +40,7 @@ class LPEJobConfig:
     kernel_size: tuple[int, int] = (5, 1)
     basis_type: str = "fourier"
     omega_init: str = "integer_harmonics"
+    omega_trainable: bool = False
     scheme: str = "taylor"
     node_type: str = "real"
     optimizer_name: str = "adamw"
@@ -324,6 +326,9 @@ def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_over
     # selects network type
     net = {"rbm": rbm, "cnn": cnn}[config.network_type]
 
+    if config.network_type.lower() == "rbm":
+        assert(isinstance(config.alpha, int))
+
     print("-" * 20)
     print("Getting initial state...")
 
@@ -333,7 +338,7 @@ def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_over
     else:
         theta_rand = net.random_θ(N=config.N, α=config.alpha, Kx=config.kernel_size[0], Ky=config.kernel_size[1], device=device)
         S_rand = random_samples(config.M, config.N, device=device)
-        vmc = VMC(theta_rand, config.Lx, config.Ly, config.alpha, model=TIM(0.0, -1.0, 0.0))
+        vmc = VMC(theta_rand, config.Lx, config.Ly, config.alpha, model=TIM(0.0, -1.0, 0.0), network_type=config.network_type)
         psi_initial, S = vmc.train(
             S_rand,
             config.batch,
@@ -367,29 +372,47 @@ def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_over
             g_qt[:1],  # constant mode
             tc.exp(-1j * omega_q.to(tc.complex128)[:, None] * t_nodes.real.to(tc.complex128)[None, :]),
         ], dim=0)
-
-    snqs = sNQS_cnn(
-        theta_jq0,
-        g_qt,
-        config.Lx,
-        config.Ly,
-        config.alpha,
-        config.dt,
-        model,
-        omega_q=omega_q,
-        omega_trainable=True,
-        n_fixed_rows=2 if config.basis_type == "fourier_linear" else 1,
-        kernel_size=config.kernel_size,
-        open_boundary=True,
-        t_nodes=t_nodes,
-        backend=config.backend,
-        scheme="taylor",
-        a_links=a_links,
-        phy_idx=phy_idx,
-    )
+    if config.network_type.lower() == "cnn":
+        snqs = sNQS_cnn(
+            theta_jq0,
+            g_qt,
+            config.Lx,
+            config.Ly,
+            config.alpha,
+            config.dt,
+            model,
+            omega_q=omega_q,
+            omega_trainable=config.omega_trainable,
+            n_fixed_rows=2 if config.basis_type == "fourier_linear" else 1,
+            kernel_size=config.kernel_size,
+            open_boundary=True,
+            t_nodes=t_nodes,
+            backend=config.backend,
+            scheme="taylor",
+            a_links=a_links,
+            phy_idx=phy_idx,
+        )
+    elif config.network_type.lower() == "rbm":
+        snqs = sNQS_rbm(
+            theta_jq0,
+            g_qt,
+            config.Lx,
+            config.Ly,
+            config.alpha,
+            config.dt,
+            model,
+            omega_q=omega_q,
+            omega_trainable=config.omega_trainable,
+            n_fixed_rows=2 if config.basis_type == "fourier_linear" else 1,
+            t_nodes=t_nodes,
+            backend=config.backend,
+            scheme="taylor",
+            a_links=a_links,
+            phy_idx=phy_idx,
+        )
 
     print("-" * 20)
-    print(f"Running sNQS_rbm with backend={config.backend}, objective={config.objective}...")
+    print(f"Running sNQS_{config.network_type} with backend={config.backend}, objective={config.objective}...")
     print(f"a_ms: {a_ms}")
     print(f"t_nodes: {_to_numpy(t_nodes)}")
     theta_jq, Ss, losses, losses_by_time, ψfinal = snqs.train(
@@ -448,16 +471,18 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dt", type=float, required=True)
     parser.add_argument("--tK", type=float, required=True)
-    parser.add_argument("--n-windows", type=int, default=1) # added, n_windows * tK = tWin
+    parser.add_argument("--n_windows", type=int, default=1) # added, n_windows * tK = tWin
     parser.add_argument("--basis_type", type=str, default='fourier')
     parser.add_argument("--omega_init", type=str, default='integer_harmonics') # added, n_windows * tK = tWin
+    parser.add_argument("--omega_train", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--network_type", type=str, default='rbm')  # added, network_type
     parser.add_argument("--epochs", type=int, default=LPEJobConfig.epochs)
     parser.add_argument("--lpe-order", type=int, default=LPEJobConfig.lpe_order)
     parser.add_argument("--optimizer", choices=["adamw", "adam"], default=LPEJobConfig.optimizer_name)
     parser.add_argument("--Q", type=int, default=LPEJobConfig.Q)
     parser.add_argument("--Lx", type=int, default=LPEJobConfig.Lx)
     parser.add_argument("--Ly", type=int, default=LPEJobConfig.Ly)
-    parser.add_argument("--alpha", type=int, default=LPEJobConfig.alpha)
+    parser.add_argument("--alpha", default=LPEJobConfig.alpha, type=ast.literal_eval, required=True)
     parser.add_argument("--M", type=int, default=LPEJobConfig.M)
     parser.add_argument("--batch", type=int, default=LPEJobConfig.batch)
     parser.add_argument("--vmc-steps", type=int, default=LPEJobConfig.vmc_steps)

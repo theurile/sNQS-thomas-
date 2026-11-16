@@ -12,21 +12,26 @@ from model import TIM
 
 
 class VMC:
-    def __init__(self, θ:tc.Tensor, Lx:int, Ly:int, α:int, model:TIM) -> None:
+    def __init__(self, θ:tc.Tensor, Lx:int, Ly:int, α:int, model:TIM, network_type, kernel_size:tuple=(5,1)) -> None:
         self.θ = θ
         self.Lx = Lx
         self.Ly = Ly
         self.N = Lx * Ly
         self.α = α
         self.model = model
+        self.network_type = network_type
+        self.kernel_size = kernel_size
         # assert model.J == model.hz == 0
         
         self.Np = θ.numel()
         self.device = θ.device
     
     @property
-    def ψ(self) -> CNN:
-        return CNN(self.θ, self.Lx, self.Ly, self.α, kernel_size=(5,1))
+    def ψ(self):
+        if self.network_type == 'cnn':
+            return CNN(self.θ, self.Lx, self.Ly, self.α, kernel_size=(5,1))
+        elif self.network_type == 'rbm':
+            return RBM(self.θ, self.N, self.α)
     
     def train(self, S0:tc.Tensor, batch:int, *, steps:int, lr:float, log_interval:int) -> tuple[CNN, tc.Tensor]:
         device = self.device

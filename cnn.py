@@ -145,20 +145,29 @@ def log2cosh(z):
     zz = sign * z  # Re(zz) >= 0
     return zz + tc.log(1 + tc.exp(-2 * zz))  # = ln(e^z + e^-z)
 
-def random_θ(N: int, α: list, Kx: int, Ky: int, device: str) -> tc.Tensor:
-    α = ([1] + [α]) if isinstance(α, int) else ([1] + list(α))
-    Np = (N + sum(α[i] for i in range(1, len(α)))
-          + sum(Kx * Ky * α[i] * α[i+1] for i in range(len(α) - 1)))
-    real_part = tc.randn(Np, dtype=tc.float64, device=device)
-    imag_part = tc.randn(Np, dtype=tc.float64, device=device)
-    θ = (real_part + 1j * imag_part) * 1.e-3
-    return θ
+def random_θ(N: int, α: list, Kx: int, Ky: int, device: str,
+             vis_scale: float = 1.e-3, last_scale: float = 1.e-2) -> tc.Tensor:
+    α = [α] if isinstance(α, int) else list(α)
+    ch = [1] + α
+
+    def randc(n, scale):
+        return (tc.randn(n, dtype=tc.float64, device=device)
+                + 1j * tc.randn(n, dtype=tc.float64, device=device)) * scale
+
+    parts = [randc(N, vis_scale)]                                   # visible biases a_n
+    for l in range(len(α)):
+        c_in, c_out = ch[l], ch[l + 1]
+        fan_in = c_in * Kx * Ky
+        w_scale = last_scale if l == len(α) - 1 else 1. / (2 * fan_in) ** 0.5
+        parts.append(randc(c_out, 1.e-3))                           # biases b
+        parts.append(randc(c_out * fan_in, w_scale))                # filters W
+    return tc.cat(parts)
+
 
 def random_θ_jq(Q: int, N: int, α: list, Kx: int, Ky: int, device: str) -> tc.Tensor:
-    α = ([1] + [α]) if isinstance(α, int) else ([1] + list(α))
-    Np = (N + sum(α[i] for i in range(1, len(α)))
-          + sum(Kx * Ky * α[i] * α[i+1] for i in range(len(α) - 1)))
-    real_part = tc.randn((Np, Q), dtype=tc.float64, device=device)
-    imag_part = tc.randn((Np, Q), dtype=tc.float64, device=device)
-    θ = (real_part + 1j * imag_part) * 1.e-3
+    θ0 = random_θ(N, α, Kx, Ky, device)                             # constant column: layer-scaled
+    θ = (tc.randn((θ0.numel(), Q), dtype=tc.float64, device=device)
+         + 1j * tc.randn((θ0.numel(), Q), dtype=tc.float64, device=device)) * 1.e-3
+    θ[:, 0] = θ0                                                    # time-dependent columns stay at 1e-3
     return θ
+

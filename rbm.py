@@ -59,7 +59,7 @@ class RBM():
         return grad_θ_mj.reshape(*m, -1)
     
 
-def random_θ(N:int, α:int, device:str) -> tc.Tensor:
+def random_θ(N:int, α:int, device:str, Kx=None, Ky=None) -> tc.Tensor:
     Np = N + α*N + N*α*N
     real_part = tc.randn(Np, dtype=tc.float64, device=device)
     imag_part = tc.randn(Np, dtype=tc.float64, device=device)
@@ -67,7 +67,7 @@ def random_θ(N:int, α:int, device:str) -> tc.Tensor:
     return θ
 
 
-def random_θ_jq(Q:int, N:int, α:int, device:str) -> tc.Tensor:
+def random_θ_jq(Q:int, N:int, α:int, device:str, Kx=None, Ky=None) -> tc.Tensor:
     Np = N + α*N + N*α*N
     real_part = tc.randn((Np, Q), dtype=tc.float64, device=device)
     imag_part = tc.randn((Np, Q), dtype=tc.float64, device=device)
