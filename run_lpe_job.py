@@ -38,6 +38,7 @@ class LPEJobConfig:
     lr: float = 1e-3
     network_type: str = "cnn"
     kernel_size: tuple[int, int] = (5, 1)
+    n_windows: int = 10
     basis_type: str = "fourier"
     omega_init: str = "integer_harmonics"
     omega_trainable: bool = False
@@ -47,7 +48,7 @@ class LPEJobConfig:
     backend: str = "exact"
     objective: str = "link_fidelity"
     J: float = -1.0
-    hx: float = -1.0
+    hx: float = -0.3
     hz: float = -0.3
     M: int = 5000
     batch: int = 1
@@ -233,11 +234,11 @@ def plot_lpe_result(data: dict, config: LPEJobConfig) -> tuple[Path, Path]:
 
     # this displays exact dynamics for any given TFIM Hamiltonians
     from utils import exact_dynamics
-    t_max = 2.0
+    t_max =  config.tK * config.n_windows
     ts_exact, sx_exact, sz_exact, energy_exact = exact_dynamics(config.Lx, config.Ly, config.J,
                                                                 config.hx, config.hz,
                                                                 t_max,
-                                                                dt_out=0.1, dt_int=0.01, order=12, device="cpu")
+                                                                dt_out=0.5, dt_int=0.01, order=12, device="cpu")
     '''
     if n10_benchmark:
         ts_exact, sx_exact, sz_exact, energy_exact = _n10_ed_benchmark()
@@ -464,7 +465,12 @@ def run_lpe_job(config, *, dry_run=False, theta_jq0_override=None, omega_q0_over
     print(f"saved HDF5 group {filename}::{group}")
     print(f"saved summary figure {summary_path}")
     print(f"saved local-loss figure {loss_path}")
-    return theta_jq, ψfinal, data, snqs.omega_q.detach().clone()
+
+    if snqs.omega_q is not None:
+        omega_q_final = snqs.omega_q.detach().clone()
+    else:
+        omega_q_final = None
+    return theta_jq, ψfinal, data, omega_q_final
 
 
 def parse_args() -> argparse.Namespace:
@@ -480,6 +486,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lpe-order", type=int, default=LPEJobConfig.lpe_order)
     parser.add_argument("--optimizer", choices=["adamw", "adam"], default=LPEJobConfig.optimizer_name)
     parser.add_argument("--Q", type=int, default=LPEJobConfig.Q)
+    parser.add_argument("--hx", type=int, default=LPEJobConfig.hz)
+    parser.add_argument("--hz", type=int, default=LPEJobConfig.hx)
+    parser.add_argument("--J", type=int, default=LPEJobConfig.J)
     parser.add_argument("--Lx", type=int, default=LPEJobConfig.Lx)
     parser.add_argument("--Ly", type=int, default=LPEJobConfig.Ly)
     parser.add_argument("--alpha", default=LPEJobConfig.alpha, type=ast.literal_eval, required=True)

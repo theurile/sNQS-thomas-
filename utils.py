@@ -130,10 +130,10 @@ def _fourier_mode(t, Q, model, config, device="cuda" if tc.cuda.is_available() e
             g_qt[1:] = tc.exp(-1j * (omega_q[:, None]) * t[None, :])
         return g_qt, omega_q
 
-def _fourier_mode_linear(t, Q, model, config, device="cpu", omega_init='energy_linspace') -> tc.Tensor:
+def _fourier_mode_linear(t, Q, model, config, device="cuda" if tc.cuda.is_available() else "cpu", omega_init='energy_linspace') -> tc.Tensor:
     dtype = tc.complex128
     t = tc.as_tensor(t, dtype=tc.float64, device=device)
-    qs = tc.arange(2, Q, device='cpu')
+    qs = tc.arange(2, Q, device=device)
 
     if omega_init == 'energy_linspace':
         theta_rand = random_θ(N=config.N, α=config.alpha, device=device)
@@ -162,17 +162,14 @@ def _fourier_mode_linear(t, Q, model, config, device="cpu", omega_init='energy_l
         )
 
         epsilon_max, _, _ = vmc_max.energy_Sx_Sz(S_max, model.bonds(config.Lx, config.Ly))
-        epsilon_max = -epsilon_max # negating to get the max energy
+        epsilon_max = -epsilon_max  # negating to get the max energy
         step = (epsilon_max - epsilon_min) / (qs.shape[0] - 1)
         omega_q = epsilon_min + (step * (qs - 1.0))
         omega_q = tc.as_tensor(omega_q, dtype=tc.float64, device=t.device)
-    elif omega_init == 'energy_spread':
-        n_modes = Q - 2  # rows 0, 1 are constant and linear
-        if n_modes % 2:
-            raise ValueError(f"Q - 2 = {n_modes} must be even (use an even Q).")
+    elif omega_init == 'analytic_ansatz':
         D0 = 2 * math.sqrt(config.hx ** 2 + config.hz ** 2)  # single-spin gap
-        qs = tc.arange(1, n_modes // 2 + 1, dtype=tc.float64, device=t.device)
-        omega_q = tc.cat([-qs.flip(0), qs]) * D0  # ±Δ0, ±2Δ0, ..., ±(n_modes/2)Δ0
+        qs = tc.arange(1, (Q - 1) // 2 + 1, dtype=tc.float64, device=t.device)
+        omega_q = tc.cat([-qs.flip(0), qs]) * D0  # ±Δ0, ±2Δ0, ... (Q odd)
     elif omega_init == 'integer_harmonics':
         omega_q = qs
         omega_q = tc.as_tensor(omega_q, dtype=tc.float64, device=t.device)
@@ -181,12 +178,11 @@ def _fourier_mode_linear(t, Q, model, config, device="cpu", omega_init='energy_l
         omega_q = epsilon_min * qs
         omega_q = tc.as_tensor(omega_q, dtype=tc.float64, device=t.device)
     elif omega_init == 'window_linspace':
-        dw = 2 * math.pi / 1.0  # spacing set by the window
-        n_pairs = max(1, int(0.3 / config.dt / 2.0 + 0.5))  # as many pairs as fit under the ceiling
-        w_edge = (n_pairs - 0.5) * dw
-        omega_q = tc.linspace(-w_edge, w_edge, 2 * n_pairs, dtype=tc.float64)  # ±dw/2, ±3dw/2, ...
+        epsilon_max = 0.1 * 2 * math.pi / config.dt
+        epsilon_min = 2 * math.pi / (2.0)
+        omega_q = tc.linspace(epsilon_min, epsilon_max, Q - 2, dtype=tc.float64, device=t.device)
     else:
-        print("Unsupported omega initialization scheme.")
+        print(f"Unsupported omega initialization scheme {omega_init}.")
 
     if t.ndim == 0:
         g_qt = tc.empty(Q, dtype=dtype, device=device)

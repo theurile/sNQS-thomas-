@@ -113,33 +113,40 @@ def _n10_ed_benchmark_hz0() -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
 
 def main() -> None:
     args = parse_args()
-    config = LPEJobConfig(
-            dt=args.dt,
-            tK=args.tK,
-            epochs=8000,
-            lr=5e-3,
-            lpe_order=args.lpe_order,
-            optimizer_name=args.optimizer,
-            basis_type=args.basis_type,
-            omega_init='analytic_ansatz',
-            omega_trainable=args.omega_train,
-            network_type=args.network_type,
-            node_type="real",
-            scheme='taylor',
-            objective='link_fidelity',
-            Q=args.Q,
-            Lx=args.Lx,
-            Ly=args.Ly,
-            alpha=args.alpha,
-            M=args.M,
-            batch=args.batch,
-            vmc_steps=args.vmc_steps,
-            loss_log_interval=args.loss_log_interval,
-            seed=args.seed,
-            output_dir=args.output_dir,
-            output_file=args.output_file,
-        )
-    # run_lpe_untrained_diagnostic(config)
-    run_windowed(config, args.tK, args.n_windows)
+    bases = ['fourier', 'fourier_linear', 'simple']
+    for base in bases:
+        args.basis_type = base
+        config = LPEJobConfig(
+                dt=args.dt,
+                tK=args.tK,
+                n_windows=args.n_windows,
+                hx=args.hx,
+                hz=args.hz,
+                J=args.J,
+                epochs=20000,
+                lr=1e-3,
+                lpe_order=args.lpe_order,
+                optimizer_name=args.optimizer,
+                basis_type=args.basis_type,
+                omega_init='integer_harmonics',
+                omega_trainable=args.omega_train,
+                network_type=args.network_type,
+                node_type="real",
+                scheme='taylor',
+                objective='link_fidelity',
+                Q=args.Q,
+                Lx=args.Lx,
+                Ly=args.Ly,
+                alpha=args.alpha,
+                M=args.M,
+                batch=args.batch,
+                vmc_steps=args.vmc_steps,
+                loss_log_interval=args.loss_log_interval,
+                seed=args.seed,
+                output_dir=args.output_dir,
+                output_file=args.output_file,
+            )
+        # run_lpe_untrained_diagnostic(config)
+        run_windowed(config, args.tK, args.n_windows)
 if __name__ == "__main__":
     main()
