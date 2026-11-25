@@ -121,7 +121,7 @@ def main() -> None:
                 hz=args.hz,
                 J=args.J,
                 epochs=args.epochs,
-                lr=args.lr,
+                lr=1e-3,
                 lpe_order=args.lpe_order,
                 optimizer_name=args.optimizer,
                 basis_type=args.basis_type,
