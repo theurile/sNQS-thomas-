@@ -238,7 +238,7 @@ def plot_lpe_result(data: dict, config: LPEJobConfig) -> tuple[Path, Path]:
     ts_exact, sx_exact, sz_exact, energy_exact = exact_dynamics(config.Lx, config.Ly, config.J,
                                                                 config.hx, config.hz,
                                                                 t_max,
-                                                                dt_out=0.5, dt_int=0.01, order=12, device="cpu")
+                                                                dt_out=0.2, dt_int=0.01, order=12, device="cpu")
     '''
     if n10_benchmark:
         ts_exact, sx_exact, sz_exact, energy_exact = _n10_ed_benchmark()
