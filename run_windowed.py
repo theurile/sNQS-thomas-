@@ -113,7 +113,6 @@ def _n10_ed_benchmark_hz0() -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
 
 def main() -> None:
     args = parse_args()
-    args.basis_type = base
     config = LPEJobConfig(
                 dt=args.dt,
                 tK=args.tK,
