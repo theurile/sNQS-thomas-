@@ -113,10 +113,8 @@ def _n10_ed_benchmark_hz0() -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
 
 def main() -> None:
     args = parse_args()
-    bases = ['fourier', 'fourier_linear', 'simple']
-    for base in bases:
-        args.basis_type = base
-        config = LPEJobConfig(
+    args.basis_type = base
+    config = LPEJobConfig(
                 dt=args.dt,
                 tK=args.tK,
                 n_windows=args.n_windows,
@@ -147,6 +145,6 @@ def main() -> None:
                 output_file=args.output_file,
             )
         # run_lpe_untrained_diagnostic(config)
-        run_windowed(config, args.tK, args.n_windows)
+    run_windowed(config, args.tK, args.n_windows)
 if __name__ == "__main__":
     main()
