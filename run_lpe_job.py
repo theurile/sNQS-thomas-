@@ -234,7 +234,7 @@ def plot_lpe_result(data: dict, config: LPEJobConfig) -> tuple[Path, Path]:
 
     # this displays exact dynamics for any given TFIM Hamiltonians
     from utils import exact_dynamics
-    t_max =  config.tK * config.n_windows
+    t_max =  config.tK
     ts_exact, sx_exact, sz_exact, energy_exact = exact_dynamics(config.Lx, config.Ly, config.J,
                                                                 config.hx, config.hz,
                                                                 t_max,
