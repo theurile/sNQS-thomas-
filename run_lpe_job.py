@@ -482,6 +482,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--omega_init", type=str, default='integer_harmonics') # added, n_windows * tK = tWin
     parser.add_argument("--omega_train", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--network_type", type=str, default='rbm')  # added, network_type
+    parser.add_argument("--objective", type=str, default='link_fidelity')  # added, loss function
     parser.add_argument("--epochs", type=int, default=LPEJobConfig.epochs)
     parser.add_argument("--lpe-order", type=int, default=LPEJobConfig.lpe_order)
     parser.add_argument("--optimizer", choices=["adamw", "adam"], default=LPEJobConfig.optimizer_name)
