@@ -73,7 +73,7 @@ def group_name(config: LPEJobConfig) -> str:
 
 
 def output_path(config: LPEJobConfig) -> Path:
-    return Path(config.output_dir) / (f"{config.basis_type}_{config.omega_init}_Q{config.Q}/" + (f"dt={config.dt:g}/tK={config.tK:g}_" + config.output_file))
+    return Path(config.output_dir) / (f"{config.network_type}_{config.basis_type}_{config.omega_init}_Q{config.Q}/" + (f"dt={config.dt:g}/tK={config.tK:g}_" + config.output_file))
 
 
 def job_label(config: LPEJobConfig) -> str:
