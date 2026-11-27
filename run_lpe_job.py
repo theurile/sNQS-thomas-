@@ -216,7 +216,7 @@ def plot_lpe_result(data: dict, config: LPEJobConfig) -> tuple[Path, Path]:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    figures_dir = Path(config.output_dir) / f"{config.basis_type}_{config.omega_init}_Q{config.Q}"
+    figures_dir = Path(config.output_dir) / f"{config.network_type}_{config.basis_type}_{config.omega_init}_Q{config.Q}"
     figures_dir.mkdir(parents=True, exist_ok=True)
 
     label = job_label(config)
